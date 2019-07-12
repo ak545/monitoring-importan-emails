@@ -554,7 +554,7 @@ def main():
 
     # Создать список файлов в кэше
     # Create Cached File List
-    for (dirpath, dirnames, filenames) in os.walk(EML_PATH):
+    for (_, _, filenames) in os.walk(EML_PATH):
         for i in filenames:
             filename, file_extension = os.path.splitext(i)
             if '.eml' in file_extension:
@@ -575,17 +575,17 @@ def main():
 
     # Переходим в папку INBOX
     # Go to the INBOX folder
-    status, select_data = mail.select('INBOX')
+    _, select_data = mail.select('INBOX')
     select_data[0].decode('utf-8')
 
     # Получить список id писем через пробел
     # Get the list id of letters through a space
-    typ, data = mail.search(None, 'ALL')
+    _, data = mail.search(None, 'ALL')
     ids = data[0]
     id_list = ids.split()
     count = len(id_list)
 
-    print(f'{SR}'')
+    print(f'{SR}')
     print('{:-<80}'.format(''))
     # print(f'Start scan         : {FLC}{"{:%d.%m.%Y %H:%M:%S}".format(datetime.now())}')
     print(f'Начало сканирования: {FLC}{"{:%d.%m.%Y %H:%M:%S}".format(datetime.now())}')
@@ -602,7 +602,7 @@ def main():
             email_id = item.decode('utf-8')
             # Получить письмо
             # Get a letter
-            typ, data = mail.fetch(email_id, '(RFC822)')
+            _, data = mail.fetch(email_id, '(RFC822)')
 
             # Необработанное содержимое письма
             # Raw message content
