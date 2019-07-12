@@ -1,4 +1,4 @@
-# Monitoring importan emails from ak545
+# Monitoring of important emais from ak545
 **check_email.py** - Это python-скрипт для мониторинга почтового ящика на предмет поступления в него определённых писем.
 
 ## Скриншоты
