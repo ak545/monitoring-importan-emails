@@ -6,8 +6,9 @@
 # Author: Andrey Klimov < ak545 at mail dot ru >
 # https://github.com/ak545
 #
-# Current Version: 0.1.1
-# Date: 12-07-2019 (dd-mm-yyyy)
+# Current Version: 0.1.3
+# Date: 01-08-2019 (dd-mm-yyyy)
+# Last Fix Date: 10-02-2020 (dd-mm-yyyy)
 #
 # License:
 #  This program is free software; you can redistribute it and/or modify
@@ -34,6 +35,7 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import make_msgid
 import email.message
 from email.header import decode_header, make_header
 from email.mime.application import MIMEApplication
@@ -55,7 +57,7 @@ init(autoreset=True)
 
 # Глобальные константы
 # Global constants
-__version__ = '0.1.1'
+__version__ = '0.1.3'
 
 FR = Fore.RESET
 FLW = Fore.LIGHTWHITE_EX
@@ -75,13 +77,13 @@ SBRIGHT = Style.BRIGHT
 SR = Style.RESET_ALL
 
 REQUEST_HEADERS = {
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_0) AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/69.0.3497.57 Safari/537.36',
 }
 
 # SMTP параметры
 # SMTP options
-
 SMTP_SERVER = 'localhost'
 SMTP_PORT = 25
 SMTP_SSL = False
@@ -135,7 +137,7 @@ RECIPIENTS_FULL = {
             'bob@example.com',
             'abuse@example.com',
             'domain@example.com',
-            'zapret-info-out@rkn.gov.ru',
+            '@rkn.gov.ru',
             '@mvd.ru',
         ]
     ],
@@ -143,7 +145,7 @@ RECIPIENTS_FULL = {
         'Moderator',
         [
             'domain@example.com',
-            'zapret-info-out@rkn.gov.ru',
+            '@rkn.gov.ru',
             '@mvd.ru',
         ]
     ],
@@ -173,7 +175,7 @@ CONTROLLED_EMAIL_ADDRESSES_SENDERS = [
     'abuse@example.com',
     'admin@example.com',
     'domain@example.com',
-    'zapret-info-out@rkn.gov.ru',
+    '@rkn.gov.ru',
     '@mvd.ru',
 ]
 
@@ -314,19 +316,14 @@ def sanitize_filename(s, restricted=False, is_id=False):
     return result
 
 
-def send_telegram(text, date_time=None):
+def send_telegram(text: str, date_time: str = None) -> str:
     """
     Отправка сообщения в Telegram-чат через Telegram-бота
     Sending a message to a Telegram chat via a Telegram bot
-    :param text: string
-    :param date_time: string
-    :return: string
+    :param text: str
+    :param date_time: str
+    :return: str
     """
-    global TELEGRAM_URL
-    global TELEGRAM_CHAT_ID
-    global REQUEST_HEADERS
-    global TELEGRAM_PROXIES
-
     if date_time:
         today = date_time
     else:
@@ -337,10 +334,12 @@ def send_telegram(text, date_time=None):
     hl = '{:-<8}'.format('')
 
     message = ''
+    fix_text = text.replace('<', '&lt;').replace('>', '&gt;')
+
     # message += '\n☢ <b>An important letter was found!</b><pre>' + today + '\n'
     message += '\n☢ <b>Обнаружено важное письмо!</b><pre>' + today + '\n'
     message += hl + '\n'
-    message += text
+    message += fix_text
     message += '</pre>\n'
     if message != '':
         message += '\n'
@@ -361,18 +360,13 @@ def send_email(message, recipient, attached_file=None, date_time=None, subject=N
     """
     Отправка e-mail получателю
     Sending a email to the recipient
-    :param message: string
+    :param message: str
     :param recipient: list
-    :param attached_file: string
-    :param date_time: string
-    :param subject: string
+    :param attached_file: str
+    :param date_time: str
+    :param subject: str
     :return: None
     """
-    global SMTP_SERVER
-    global SMTP_PORT
-    global SMTP_SENDER
-    global SMTP_PASSWORD
-
     msg_mime = MIMEMultipart('alternative')
     msg_mime['From'] = SMTP_SENDER
     msg_mime['To'] = recipient[1] + ' <' + recipient[0] + '>'
@@ -414,10 +408,15 @@ def send_email(message, recipient, attached_file=None, date_time=None, subject=N
     eml_text = ''
     if attached_file:
         if Path(attached_file).is_file():
-            with open(attached_file, 'rb') as file:
+            with open(attached_file, 'rb+') as file:
                 eml_msg = BytesParser(policy=policy.default).parse(file)
-            eml_text = eml_msg.get_body(preferencelist='plain').get_content()
-            eml_text = str(eml_text).strip()
+            eml_text_b = eml_msg.get_body()
+            if eml_text_b:
+                eml_text = eml_text_b.get_content()
+                if eml_text:
+                    eml_text = re.sub(r'<br.*?>', '\n', eml_text)
+                    eml_text = re.sub(r'<.*?>', '', eml_text)
+                    eml_text = str(eml_text).strip()
 
     # Для простой части
     # For part plain
@@ -466,7 +465,7 @@ def send_email(message, recipient, attached_file=None, date_time=None, subject=N
                 with zipfile.ZipFile(eml_zipfile, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     zipf.write(attached_file, basename(attached_file))
 
-            with open(eml_zipfile, 'rb') as file:
+            with open(eml_zipfile, 'rb+') as file:
                 eml_part = MIMEApplication(
                     file.read(),
                     Name=basename(eml_zipfile)
@@ -527,14 +526,6 @@ def send_email(message, recipient, attached_file=None, date_time=None, subject=N
 
 
 def main():
-    global EML_PATH
-    global EML_PATH_READY
-    global CONTROLLED_EMAIL_SERVER
-    global CONTROLLED_EMAIL_ADDRESSES
-    global CONTROLLED_EMAIL_ADDRESSES_PASSWORD
-    global CONTROLLED_EMAIL_ADDRESSES_SENDERS
-    global RECIPIENTS_FULL
-
     try:
         Path(EML_PATH).mkdir(parents=True, exist_ok=True)
     except:
@@ -567,7 +558,19 @@ def main():
     # Подключение к IMAP4 серверу
     # Connect to IMAP4 server
     mail = imaplib.IMAP4_SSL(CONTROLLED_EMAIL_SERVER)
-    mail.login(CONTROLLED_EMAIL_ADDRESSES, CONTROLLED_EMAIL_ADDRESSES_PASSWORD)
+    try:
+        r, data = mail.login(CONTROLLED_EMAIL_ADDRESSES, CONTROLLED_EMAIL_ADDRESSES_PASSWORD)
+        if r != "OK":
+            str_e = str(data)
+            str_e = str_e.strip("b'").strip("'")
+            # print(f'{FLR}Error login        : {str_e}')
+            print(f'{FLR}Ошибка подключения : {str_e}')
+    except (imaplib.IMAP4.error, OSError) as e:
+        str_e = str(e)
+        str_e = str_e.strip("b'").strip("'")
+        # print(f'{FLR}Error login        : {str_e}')
+        print(f'{FLR}Ошибка подключения : {str_e}')
+        sys.exit(-1)
 
     # Получить список каталогов "INBOX", "Sent", и т.п.
     # Get the list of catalogs "INBOX", "Sent", etc.
@@ -599,10 +602,16 @@ def main():
         # Анализ имеющихся писем
         # Analysis of available letters
         for item in id_list:
-            email_id = item.decode('utf-8')
+            email_id = item.decode('utf-8').strip()
+            
+            if email_id == '':
+                continue
+
             # Получить письмо
+            # Флаг "Невидимый" не сбрасывается
             # Get a letter
-            _, data = mail.fetch(email_id, '(RFC822)')
+            # "Unseen" flag is not reset
+            _, data = mail.fetch(email_id, '(BODY.PEEK[])')
 
             # Необработанное содержимое письма
             # Raw message content
@@ -610,20 +619,64 @@ def main():
 
             # Парсинг содержимого письма
             # Parsing the contents of the letter
-            msg = email.message_from_bytes(raw_email,
-                                           _class=email.message.EmailMessage)
+            msg = email.message_from_bytes(
+                      raw_email,
+                      _class=email.message.EmailMessage
+                  )
+
             # Получить дату письма
             # Get the date of the letter
-            timestamp = email.utils.parsedate_tz(msg['Date'])
-            year, month, day, hour, minute, second = timestamp[:6]
+            str_date = ''
+            if msg['Date'] is not None:
+                timestamp = email.utils.parsedate_tz(msg['Date'])
+                year, month, day, hour, minute, second = timestamp[:6]
+
+                str_date = '{0:02d}.'.format(day)
+                str_date += '{0:02d}.'.format(month)
+                str_date += '{0:04d} '.format(year)
+                str_date += '{0:02d}:'.format(hour)
+                str_date += '{0:02d}:'.format(minute)
+                str_date += '{0:02d}'.format(second)
 
             # Получить адрес отправителя письма
             # Get the sender address
-            msg_from = email.utils.parseaddr(msg['From'])
+            msg_from_decoded = ''
+            if msg['From'] is not None:
+                str_from = str(msg["From"])
+                if '=?' in str_from.strip():
+                    msg_from_decoded = str(
+                        make_header(decode_header(str_from))
+                    )
+                else:
+                    msg_from_decoded = str_from
+
+                msg_from_decoded = (
+                    msg_from_decoded
+                    .replace("\n", "")
+                    .replace("\r", "")
+                    .replace("\t", "")
+                    .strip()
+                )
 
             # Получить декодированную тему письма
             # Get a decoded letter subject
-            subj = str(make_header(decode_header(msg['Subject'])))
+            subj = ""
+            if msg["Subject"]:
+                str_subj = str(msg["Subject"])
+                if '=?' in str_subj.strip():
+                    subj = str(make_header(
+                        decode_header(str_subj))
+                    )
+                else:
+                    subj = str_subj
+
+                subj = (
+                    subj
+                    .replace("\n", "")
+                    .replace("\r", "")
+                    .replace("\t", "")
+                    .strip()
+                )
 
             # Анализ данных письма
             # Analysis of the letter data
@@ -638,7 +691,7 @@ def main():
                 # (check if the sender's address or the fragment of the
                 # sender's address is in the list of monitored important
                 # letters CONTROLLED_EMAIL_ADDRESSES_SENDERS)
-                if control_email in msg['From']:
+                if control_email in msg_from_decoded:
                     # Если да, устнавливаем флаг важности письма
                     # If yes, set the letter importance flag
                     is_important_letter = True
@@ -660,23 +713,12 @@ def main():
 
                 # Message-ID письма
                 # Message-ID of the letter
-                message_id = 'tmp'
-                if msg['Message-ID']:
-                    message_id = str(msg['Message-ID']).strip('<').strip('>')
-                    print(f'Message-ID         : {FLG}{message_id}')
-                    message_id = sanitize_filename(message_id)
+                str_domain = msg_from_decoded.split('@')[-1].strip('>').strip()
+                message_id = f'{str_date.replace(":", ".")}@{str_domain}'
+                message_id = sanitize_filename(message_id)
 
-                if len(msg_from) > 1:
-                    str_from = str(msg_from[1])
-                else:
-                    str_from = msg_from
-
-                print(f'From               : {FLG}{str_from}')
-
-                str_date = str(day) + '.' + str(month) + '.' + str(year) + ' '
-                str_date += str(hour) + ':' + str(minute) + ':' + str(second)
+                print(f'From               : {FLG}{msg_from_decoded}')
                 print(f'Date               : {FLG}{str_date}')
-
                 print(f'Subject            : {FLG}{subj}')
 
                 # Добавить ID письма в список "письма на сервере"
@@ -698,7 +740,7 @@ def main():
                     # папке кэша
                     # Save the original letter in the .EML format in
                     # the cache folder
-                    with open(eml_file, 'wb') as file:
+                    with open(eml_file, 'wb+') as file:
                         file.write(raw_email)
 
                     # Добавить ID письма в список "письма в кэше"
@@ -719,9 +761,9 @@ def main():
                     print('{:-<80}'.format(''))
                     continue
 
-                warning_msg = 'From   : ' + str_from + '\n'
-                warning_msg += 'Date   : ' + str_date + '\n'
-                warning_msg += 'Subject: ' + subj + '\n'
+                warning_msg = f'From   : {msg_from_decoded}\n'
+                warning_msg += f'Date   : {str_date}\n'
+                warning_msg += f'Subject: {subj}\n'
 
                 email_msg = warning_msg
 
@@ -730,20 +772,26 @@ def main():
                     # письма из файла в кэше
                     # Read the raw text of the original
                     # letter from the file in the cache
-                    with open(eml_file, 'rb') as file:
+                    with open(eml_file, 'rb+') as file:
                         eml_msg = BytesParser(policy=policy.default).parse(file)
 
                     # Конвертировать сырой текст письма в читаемый текст
                     # Convert raw letter text to readable text
-                    eml_text_part = eml_msg.get_body(preferencelist='plain').get_content()
+                    eml_text_part = ''
+                    eml_text_part_b = eml_msg.get_body()
+                    if eml_text_part_b is not None:
+                        eml_text_part = eml_text_part_b.get_content()
+                        if eml_text_part is not None:
+                            eml_text_part = re.sub(r'<br.*?>', '\n', eml_text_part)
+                            eml_text_part = re.sub(r'<.*?>', '', eml_text_part)
 
-                    # Ограничить длину текста (для показа только
-                    # фрагмента текста в Telegram-чате)
-                    # Limit the length of the text (to display only
-                    # a fragment of the text in the Telegram-chat)
-                    eml_text_part = str(eml_text_part)[:142].strip()
+                            # Ограничить длину текста (для показа только
+                            # фрагмента текста в Telegram-чате)
+                            # Limit the length of the text (to display only
+                            # a fragment of the text in the Telegram-chat)
+                            eml_text_part = str(eml_text_part)[:142].strip()
 
-                    if eml_text_part != '':
+                    if eml_text_part is not None and eml_text_part != '':
                         warning_msg += '{:-<8}\n'.format('')
                         # warning_msg += 'Summary           :\n'
                         warning_msg += 'Краткое содержание:\n'
@@ -802,7 +850,7 @@ def main():
                     is_prohibited = False
                     prohibited_part = ''
                     for prohibited_email in prohibited_email_list:
-                        if prohibited_email in str_from:
+                        if prohibited_email in msg_from_decoded:
                             is_prohibited = True
                             prohibited_part = prohibited_email
                             break
@@ -845,11 +893,11 @@ def main():
                         # Unset the flag "Send full telegram notification"
                         is_send_full_telegram_notification = False
                         # print(f'\nSkipped letter     : {FLR}{to_list[0]} ({to_list[1]}){FR}\n'
-                        #       f'Cause              : Incoming letter {FLG}{str_from}{FR} '
+                        #       f'Cause              : Incoming letter {FLG}{msg_from_decoded}{FR} '
                         #       f'is in the list of prohibited '
                         #       f'for this recipient ({FLR}{prohibited_part}{FR})')
                         print(f'\nПропускается письмо: {FLR}{to_list[0]} ({to_list[1]}){FR}\n'
-                              f'Причина            : Входящее письмо {FLG}{str_from}{FR} '
+                              f'Причина            : Входящее письмо {FLG}{msg_from_decoded}{FR} '
                               f'находится в списке запрещённых для '
                               f'этого получателя ({FLR}{prohibited_part}{FR})')
                         print('{:-<80}'.format(''))
@@ -891,18 +939,8 @@ def main():
                     # Отправка неполного уведомления в Telegram-чат
                     # Sending an incomplete notification to Telegram chat
                     send_telegram(warning_msg, date_time=date_time_discovery)
-            # else:
-            #     # Это для отладки - показать все остальные,
-            #     # неважные письма
-            #     # This is for debugging - show all other
-            #     # unimportant letters.
-            #     print('')
-            #     if len(msg_from) > 1:
-            #         print(f'From   : {msg_from[1]}')
-            #     else:
-            #         print(f'From   : {msg_from}')
-            #     print(f'Date   : {day}.{month}.{year} {hour}:{minute}:{second}')
-            #     print(f"Subject: {subj}")
+
+        mail.close()
 
     # Отключение от IMA4-сервера
     # Disconnect from IMA4 server
@@ -974,9 +1012,5 @@ if __name__ == '__main__':
         print('Error. Python version 3.6 and above required')
         sys.exit(-1)
 
-    rc = 0
-    try:
-        main()
-    except Exception as e:
-        print('Error: %s' % e, file=sys.stderr)
-    sys.exit(rc)
+    main()
+    sys.exit(0)
