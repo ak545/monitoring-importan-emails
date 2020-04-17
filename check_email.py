@@ -6,7 +6,7 @@
 # Author: Andrey Klimov < ak545 at mail dot ru >
 # https://github.com/ak545
 #
-# Current Version: 0.1.3
+# Current Version: 0.1.4
 # Date: 01-08-2019 (dd-mm-yyyy)
 # Last Fix Date: 10-02-2020 (dd-mm-yyyy)
 #
@@ -54,9 +54,15 @@ except ImportError:
 # Init colorama
 init(autoreset=True)
 
+# Check Python Version
+if sys.version_info < (3, 6):
+    print("Error. Python version 3.6 or later required to run this script")
+    print("Your version:", sys.version)
+    sys.exit(-1)
+
 # Глобальные константы
 # Global constants
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 FR = Fore.RESET
 FLW = Fore.LIGHTWHITE_EX
@@ -1006,10 +1012,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # Check Python Version
-    if sys.version_info < (3, 6):
-        print('Error. Python version 3.6 and above required')
-        sys.exit(-1)
-
     main()
     sys.exit(0)
