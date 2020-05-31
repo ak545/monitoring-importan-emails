@@ -6,9 +6,9 @@
 # Author: Andrey Klimov < ak545 at mail dot ru >
 # https://github.com/ak545
 #
-# Current Version: 0.1.4
+# Current Version: 0.1.5
 # Date: 01-08-2019 (dd-mm-yyyy)
-# Last Fix Date: 10-02-2020 (dd-mm-yyyy)
+# Last Fix Date: 01-06-2020 (dd-mm-yyyy)
 #
 # License:
 #  This program is free software; you can redistribute it and/or modify
@@ -62,7 +62,7 @@ if sys.version_info < (3, 6):
 
 # Глобальные константы
 # Global constants
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 FR = Fore.RESET
 FLW = Fore.LIGHTWHITE_EX
@@ -212,7 +212,7 @@ TELEGRAM_CHAT_ID = '<INSERT YOUR CHANNEL ID>'
 TELEGRAM_URL = 'https://api.telegram.org/bot' + TELEGRAM_MY_TOKEN + '/'
 
 SEP = os.sep
-pathname = os.path.dirname(sys.argv[0]).rstrip(SEP)
+pathname = os.path.dirname(os.path.abspath(__file__))
 
 # Папка для хранения актуального кэша писем.
 # По этому кэшу определяется, отправлялось
